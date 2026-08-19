@@ -49,6 +49,16 @@ convention so the numbers keep their context.
 | `S-E-improved-node-radiusconf.dense.json` | same windings, radius as conf | 8156 / 8156 | 0.295 | 2.587 | **anti-calibrated, 0.29 → 0.01 — do not use** |
 | `S-E-improved-radial.dense.json` | ST radial | 8156 / 8156 | 0.233 | 3.525 | flat |
 
+**Which tolerance these are scored at, because it changes them.** Everything in the table
+above is the bench's constant matching tolerance, τ = 37.5 voxels, which is the regime the
+scoring ran in on 30 July. The bench later moved toward a per-point τ derived from local
+node spacing (median 9.17 vox). We rescored all three arms under it
+(`_localtau/paris4_rescore.json`, our own run): coverage falls from 1.000 to **0.2115**
+(1725 of 8156 pairs) for every arm alike, our M1 goes 0.262 → **0.286**, and the winding-sync
+L1 rebuild goes 0.165 → **0.243** — so the lead over it narrows from about 1.8× to about
+**1.18×**. Neither regime is wrong; quoting coverage 1.000 or the 1.8× lead without saying
+which one produced it would be.
+
 Context for those numbers:
 
 * **M1 0.295 is about 1.8× the strongest baseline we can rebuild.** This README used to say
@@ -66,10 +76,12 @@ Context for those numbers:
   density this submission uses introduces no selection bias — an earlier, sparser
   submission of ours was blocked by the bench's node-gap gate exactly because it could
   have.
-* `cycle-conf` was, in the bench author's words, the best-calibrated confidence signal the
-  bench had measured at that point, including his own estimator. That is a statement about
-  one bench on one scroll at one date, and two further submissions have arrived since. It
-  also does not survive contact with the geometric baseline in the next heading down.
+* `cycle-conf` was, in the bench author's words, *"the best confidence signal measured
+  here so far"*, including his own estimator. His exact wording matters: the bench scores
+  confidence by rank, so that is a statement about monotone discrimination, not about
+  calibration, and this README does not upgrade it to one. It is also one bench on one
+  scroll on one date, two further submissions have arrived since, and it does not survive
+  contact with the geometric baseline in the next heading down.
 
 ![Accuracy per confidence decile](calibration.png)
 
