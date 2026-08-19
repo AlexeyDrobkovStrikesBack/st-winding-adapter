@@ -58,6 +58,17 @@ Context for those numbers, in the bench author's framing:
   measured at that point, including his own estimator. That is a statement about one
   bench on one scroll at one date, and two further submissions have arrived since.
 
+![Accuracy per confidence decile](calibration.png)
+
+Both curves come from the same winding predictions; only the reported confidence
+differs. `cycle-conf` rises 0.107 → 0.243 across deciles, `radius-conf` falls
+0.296 → 0.007 — it is most wrong exactly where it is most sure. Reproduce with
+`make_calibration_figure.py` from the runner's per-pair CSVs.
+
+Note the y axis is accuracy over **all** pairs in a decile (overall 0.193), not
+the M1 figure in the table above, which is exact agreement on dw = 1 only. The
+two numbers answer different questions and are not comparable.
+
 The radius-conf arm is kept in the repository deliberately as a clean negative: identical
 windings, a confidence that inverts. It is what a plausible-looking confidence signal
 looks like when it is wrong.
