@@ -228,7 +228,14 @@ near-field side effect, for completeness: M1 stays at
   **not** been re-emitted, for the same reason the confidence column was not
   swapped: re-emitting changes a scored submission, and we will not do that
   silently. Until a corrected arm is published and re-scored on the bench, the
-  shipped files stand as scored, bug included.
+  shipped files stand as scored, bug included. Update, 2026-08-20 (later pass):
+  a corrected file now ships **alongside** the scored one —
+  `adapters/S-E-improved-node.dense.chirality-corrected.json`, emitted through
+  the same generator; the shipped file is byte-unchanged and remains the one
+  the published score refers to. Both score rows, including the metrics the
+  correction makes worse, are in
+  [the corrected file](#a-chirality-corrected-file-ships-alongside-the-scored-one-2026-08-20)
+  under Scores.
 * **Two of our per-slice umbilici contradict each other.** The z7500 umbilicus sits
   about 6,600 voxels in-plane from the z9000 one, which is physically impossible
   for the same scroll core — one of the two is wrong, and we do not know which.
@@ -238,6 +245,32 @@ near-field side effect, for completeness: M1 stays at
   scroll-truth region (112 covered pairs, already flagged above as a footnote). It
   does not touch the winding magnitudes themselves (the L2 group synchronisation
   does not use the umbilicus) or the other slabs.
+  Investigated 2026-08-20 (later pass): the question "which of the two is wrong"
+  turned out to be ill-posed — **neither point is an umbilicus**. All seven
+  recorded umbilici lie outside the papyrus cross-section: the closest sits
+  526<!--ledger:reemit.umb_min_node_dist--> voxels from the nearest graph node,
+  and every one of them is at least
+  2886<!--ledger:reemit.umb_min_centroid_dist--> voxels from the node-cloud
+  centroid, which is where the spiral core visibly sits in every slice we
+  rendered. They are outputs of the winding-sync umbilicus search, which
+  maximises the absolute Spearman correlation between winding and radius over
+  candidate centres, with no constraint that the centre lie inside the scroll —
+  and the absolute value admits a mirror solution on the opposite side. Five
+  slabs converged on one side of the scroll (a track smooth in z); z7500 and
+  z13500 converged on the mirror side, only
+  324.7<!--ledger:reemit.umb_gap_z7500_z13500--> voxels from each other,
+  6828.4<!--ledger:reemit.umb_gap_z7500_z9000--> voxels from the z9000 point
+  (and z13500's sits 6812.4<!--ledger:reemit.umb_gap_z13500_z12000--> voxels
+  from z12000's) — and those are exactly the two slabs whose sign shipped
+  inverted. One root cause, two symptoms: the generator orients lamina-normals
+  outward from the recorded point and resolves the per-slab sign by correlating
+  against radius from it, so a mirror-side point inverts the slab's sign
+  convention. The corrected file (see Scores) therefore treats z7500 the same
+  as z13500 — the canonicalisation rule is applied uniformly — and the per-slab
+  bench split for z7500, which is adverse, is printed in the Scores section
+  rather than resolved by hand-picking signs. Unchanged from before: the
+  winding magnitudes (the L2 sync uses no umbilicus) and the five track slabs'
+  sign.
 
 ## Scores
 
@@ -267,6 +300,63 @@ An earlier version of this paragraph said "we rescored all three arms under it" 
 the 1.18× against the 1.8×; that was false about which arms were rescored, and the ratio
 comparison was across arms — corrected 2026-08-20. Neither regime is wrong; quoting a
 coverage or a lead without saying which regime and which arm produced it would be.
+
+### A chirality-corrected file ships alongside the scored one (2026-08-20)
+
+`adapters/S-E-improved-node.dense.chirality-corrected.json` is the primary arm
+re-emitted through the package's own generator with one change: each per-slice
+field's sign is set so that winding increases outward — the convention the Method
+section always claimed. The generator run first reproduced the shipped file exactly
+(identical points, winding and confidence values, to the last byte of precision),
+then the rule flipped exactly the two slabs the drift section identified, z7500 and
+z13500. The two files differ in 1192<!--ledger:reemit.n_winding_changed--> of 8344
+winding values — the points of those two slabs — and in nothing else: coordinates
+and confidences are identical.
+
+The shipped `S-E-improved-node.dense.json` is byte-unchanged and stays. The score
+table above is the bench author's measurement of that exact file; replacing a scored
+file would orphan his published numbers, so the corrected version is an addition,
+not a substitute. Switch between the two by filename.
+
+Both files scored on our own reimplementation of the bench — same 8156 pairs, same
+pair construction as the drift section; this is our run, not the bench author's
+(sign agreement = fraction of oriented GT pairs, true dw > 0, with predicted
+dw > 0):
+
+| adapter file | M1 (exact on dw=1) | MAE | sign agreement |
+|---|---|---|---|
+| `S-E-improved-node.dense.json` (shipped; the file the published score refers to) | 0.2955<!--ledger:reemit.gauge_M1_shipped--> | 2.5866<!--ledger:reemit.gauge_MAE_shipped--> | 0.6517<!--ledger:reemit.gauge_sign_shipped--> |
+| `S-E-improved-node.dense.chirality-corrected.json` | 0.3064<!--ledger:reemit.gauge_M1_corrected--> | 2.6489<!--ledger:reemit.gauge_MAE_corrected--> | 0.6363<!--ledger:reemit.gauge_sign_corrected--> |
+
+The correction is not a uniform win, and we print the split rather than the
+average. All of the net M1 gain comes from the z13500 slab, where same-slab M1 goes
+0.152<!--ledger:reemit.z13500_M1_shipped--> →
+0.265<!--ledger:reemit.z13500_M1_corrected--> on 204 dw=1 pairs. On the z7500 slab
+alone the flip scores worse — 0.197<!--ledger:reemit.z7500_M1_shipped--> →
+0.167<!--ledger:reemit.z7500_M1_corrected--> on 66 dw=1 pairs — and MAE and the
+pooled sign-agreement fraction both degrade, as the table shows. Per GT collection
+the sign agreement is all-or-nothing in both slabs and in both files: the field's
+gradient is radial about the recorded off-scroll reference point (see the umbilicus
+by-product above), not about the true core, so which convention a local collection
+appears to favour depends on where that collection sits. That is the in-plane
+decoherence of the drift section wearing a different hat, not a chirality
+measurement. We do not pick per-slab signs by what scores best on this ground
+truth — that would tune the submission to the bench — so the corrected file applies
+the stated rule uniformly and the z7500 numbers stand as they came out.
+
+Which file to use: the corrected one, if you use the adapter at all — it implements
+the documented sign convention, and the sign-related statements in the Method
+section describe it. Use the shipped file to reproduce or compare against the
+published score above, which refers to the shipped file and nothing else. The other
+two files in `adapters/` still carry the shipped sign convention on z7500/z13500:
+the radius-conf file is preserved deliberately as the negative control described
+below, and the radial arm was not re-emitted.
+
+What the correction does not do: it does not touch the drift. The ~30-voxel
+coherence length, the failed repair, and every warning in this README about
+carrying a winding number across a scroll stand exactly as written. Beyond its near
+field the corrected file is wrong in the same way and by the same amounts as the
+shipped one; the correction changes a sign, not the range.
 
 Context for those numbers:
 
@@ -425,7 +515,10 @@ the same per-slice umbilicus the generator itself used. This is also the mechani
 the sign-corrected radius result above. One of those umbilici is now known to be suspect
 — the z7500 one sits about 6,600 voxels in-plane from the z9000 one, which cannot be
 right; see [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20) for
-what that does and does not affect.
+what that does and does not affect. (Established 2026-08-20, later pass: none of the
+seven recorded umbilici is the anatomical core — all sit outside the papyrus; see the
+umbilicus by-product bullet in the drift section. The radius deciles here are computed
+from those recorded points and inherit that distortion.)
 
 Two other slices, for completeness: accuracy by position along the scroll axis varies
 (0.14–0.27 across z quintiles) with no clean ordering, and within dw = 1 pairs the shortest
@@ -597,7 +690,9 @@ corrected 2026-08-20.
    two of the seven slabs (z7500, z13500) it comes out inverted — see
    [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20) and caveats.
    An earlier version of this line stated the umbilicus anchoring as fact; corrected
-   2026-08-20.
+   2026-08-20. A file with the sign convention corrected now ships alongside the scored
+   one — see
+   [the corrected file](#a-chirality-corrected-file-ships-alongside-the-scored-one-2026-08-20).
 4. **Confidence.** Cycle-consistency: discontinuities accumulated around closed paths.
 
 ## Honest caveats
@@ -617,7 +712,10 @@ corrected 2026-08-20.
   uniformly here: the sign convention on the z7500 and z13500 slabs is inverted (winding
   decreases outward), matched to the winding-sync L1 field rather than the umbilicus —
   found 2026-08-20, files not re-emitted; see
-  [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20).
+  [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20). Later the
+  same day a corrected file was published **alongside** the scored one, which remains
+  unchanged; see
+  [the corrected file](#a-chirality-corrected-file-ships-alongside-the-scored-one-2026-08-20).
 * **radius-conf is anti-calibrated.** Listed above; do not use it as a confidence. Its
   sign-corrected twin, however, beats the confidence we ship.
 * **The independence argument is only partly supported**, and the test that would settle it
