@@ -109,7 +109,7 @@ convention so the numbers keep their context.
 
 | adapter file | arm | scorable | M1 (exact on dw=1) | MAE | confidence |
 |---|---|---|---|---|---|
-| `S-E-improved-node.dense.json` | ST + L2 group-sync, cycle-conf | 8156 / 8156 (coverage 1.000) | **0.295** | 2.587 | monotone, 0.11 → 0.24 across deciles |
+| `S-E-improved-node.dense.json` | ST + L2 group-sync, cycle-conf | 8156 / 8156 (coverage 1.000) | **0.295** | 2.587 | rising, 0.11 → 0.24 across deciles (with local dips — see the figure below) |
 | `S-E-improved-node-radiusconf.dense.json` | same windings, radius as conf | 8156 / 8156 | 0.295 | 2.587 | **anti-calibrated, 0.29 → 0.01 — do not use** |
 | `S-E-improved-radial.dense.json` | ST radial | 8156 / 8156 | 0.233 | 3.525 | flat |
 
@@ -143,10 +143,17 @@ Context for those numbers:
   right and is replaced by something checkable: all five baseline figures come out of
   `evidence_numbers.py` (see [below](#re-deriving-these-numbers)) from our local bench runs,
   which are not in this repository; what was never reproducible was the *label* on 0.130.
-* The score is **identical at all three matching tolerances** (τ/2, τ, 2τ), so the point
-  density this submission uses introduces no selection bias — an earlier, sparser
-  submission of ours was blocked by the bench's node-gap gate exactly because it could
-  have.
+* The score is **identical at all three matching tolerances** (τ/2, τ, 2τ). That sweep
+  is the bench author's own diagnostic run of 30 July 2026, reported here on his word:
+  it is not among the numbers `evidence_numbers.py` re-derives, so it is not reproducible
+  from this repository's scripts. (We re-ran the public
+  runner on our local ground-truth copy at τ = 18.75 / 37.5 / 75 vox on 20 August 2026
+  and got the same M1 / MAE / coverage at all three — but that check needs our local run
+  directory, which does not ship either.) The evidence that the point density this
+  submission uses introduces no selection bias is not this sweep but the dense-emission
+  ablation below, whose predictions are byte-identical, 0 of 8156 differing; an earlier,
+  sparser submission of ours was blocked by the bench's node-gap gate exactly because it
+  could have introduced one.
 * `cycle-conf` was, in the bench author's words, *"the best confidence signal measured
   here so far"*, including his own estimator. His exact wording matters: the bench scores
   confidence by rank, so that is a statement about monotone discrimination, not about
@@ -353,9 +360,15 @@ All on the same 8156 pairs, all from runs already on disk.
 
 * **Finer nodes** (coarse seed-snap graph → denser `graphs200`, 172 635 → 285 372 seeds,
   method unchanged): M1 0.2616 → **0.2955**, MAE 2.4770 → **2.5866**. Better on M1 and
-  *worse* on MAE; 4834 of 8156 rounded predictions change. About a third of the headline
-  M1's margin over the coarse graph is node density rather than method. This README
-  previously quoted only the improved half.
+  *worse* on MAE; 4834 of 8156 rounded predictions change. The margin over the coarse
+  graph (0.034) is node density in its entirety, by construction — the method is
+  unchanged. Set against the headline arm's margin over the strongest baseline we can
+  rebuild (0.295 − 0.165 = 0.130, anchored winding-sync L1), node density accounts for
+  0.034 of it: **about a quarter of the headline margin is node density rather than
+  method**. An earlier version of this bullet said "about a third of the headline M1's
+  margin over the coarse graph is node density", which does not parse — that margin is
+  all density by construction, and the fraction belongs to the margin over the baseline;
+  corrected 2026-08-20. This README previously quoted only the improved half.
 * **Dense point emission** (one point per GT point, grid-snapped → core + densifier with
   dedup): predictions **byte-identical**, 0 of 8156 differ, M1 / MAE / accuracy unchanged to
   all digits. The rebuild existed only to pass the bench's node-gap gate (NN-gap 22.63 →
@@ -405,7 +418,7 @@ git clone https://github.com/pscamillo/constraint-gauge
 cd constraint-gauge
 python run_gauge.py --gt <paris4 ground-truth json> \
     --adapter json:/path/to/S-E-improved-node.dense.json \
-    --pitch-um 187.3 --um-per-vox 2.4 --out-prefix repro
+    --pitch-um 180 --um-per-vox 2.4 --out-prefix repro
 ```
 
 The runner writes `repro_pairs.csv` and `repro_summary.json`; every figure in the table
@@ -414,7 +427,12 @@ above is read out of those, none is typed by hand.
 One practical note: the ground truth is the human winding annotation over the published
 Paris 4 point collections, and as of our last look at the bench repository the GT file
 itself was not committed there — ask the bench author which file to point `--gt` at. The
-`--pitch-um` value only affects the bench's own conversions, not this adapter's output.
+`--pitch-um` value only affects the bench's own conversions, not this adapter's output —
+but it does set the matching tolerance: 180 µm is what the stored runs used and gives
+the τ = 37.5 vox the Scores section quotes (the shipped run summary records
+`pitch_um: 180.0, tau_vox: 37.5`). An earlier version of this command said
+`--pitch-um 187.3`, which gives τ = 39.0 and contradicted the stated tolerance;
+corrected 2026-08-20.
 
 ## Method, briefly
 
@@ -476,7 +494,16 @@ write-up were produced by a Claude agent.** What that does and does not mean her
 
 * **The headline scores are not the model's own report of itself.** They come from an
   independent run by the bench author on his own machine, against ground truth we do not
-  hold, with criteria hashed and sealed before any external generator was measured.
+  hold. His criteria were hashed and sealed on 28 July 2026 naming three subjects, none
+  of them us, with changes permitted only by dated addendum — and addenda were then
+  used: we were entered as subject S-E by one, the first run's operating parameters
+  (pitch 180 µm, hence τ = 37.5 vox) were set by another, and the matching-tolerance
+  rule the sealed body declared fixed was itself revised by dated addenda into the
+  per-point rule described under Scores. All of those addenda are dated 28 July 2026 and
+  predate the 30 July run behind the table above, so nothing was adjusted after seeing
+  our numbers — but an earlier version of this sentence said the criteria were "hashed
+  and sealed before any external generator was measured", which claimed more than the
+  seal covers; corrected 2026-08-20.
 * **The scores re-run.** The three files in `adapters/` were re-scored on the public
   runner before this repository was published, and reproduce the table exactly: 0.295 /
   2.587 / coverage 1.000 for the node arm, 0.233 / 3.525 for radial, deciles 0.107 → 0.243.
