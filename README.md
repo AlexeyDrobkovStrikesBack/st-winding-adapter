@@ -52,12 +52,19 @@ convention so the numbers keep their context.
 **Which tolerance these are scored at, because it changes them.** Everything in the table
 above is the bench's constant matching tolerance, τ = 37.5 voxels, which is the regime the
 scoring ran in on 30 July. The bench later moved toward a per-point τ derived from local
-node spacing (median 9.17 vox). We rescored all three arms under it
-(`_localtau/paris4_rescore.json`, our own run): coverage falls from 1.000 to **0.2115**
-(1725 of 8156 pairs) for every arm alike, our M1 goes 0.262 → **0.286**, and the winding-sync
-L1 rebuild goes 0.165 → **0.243** — so the lead over it narrows from about 1.8× to about
-**1.18×**. Neither regime is wrong; quoting coverage 1.000 or the 1.8× lead without saying
-which one produced it would be.
+node spacing (median 9.17 vox). We rescored **our coarse arm and the two winding-sync
+baselines** under it (`_localtau/paris4_rescore.json`, our own run) — the coarse arm is
+the seed-snap graph of the Ablations section, M1 0.262 at constant τ, and is **not one of
+the three adapter files in the table above**. Coverage falls from 1.000 to **0.2115**
+(1725 of 8156 pairs) for all three rescored arms alike, our coarse arm goes
+0.262 → **0.286**, and the winding-sync L1 rebuild goes 0.165 → **0.243** — so on the one
+arm of ours scored both ways, the lead over the L1 rebuild narrows from about 1.6× to
+about **1.18×**. **The dense arm in the table above (M1 0.295) has not been rescored
+under the per-point rule**, so its 1.8× constant-τ lead has no per-point-τ counterpart.
+An earlier version of this paragraph said "we rescored all three arms under it" and set
+the 1.18× against the 1.8×; that was false about which arms were rescored, and the ratio
+comparison was across arms — corrected 2026-08-20. Neither regime is wrong; quoting a
+coverage or a lead without saying which regime and which arm produced it would be.
 
 Context for those numbers:
 
