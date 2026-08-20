@@ -19,8 +19,9 @@ list, one winding number per point, one confidence per point:
 ## Why you might care
 
 Winding constraints are a crowded corner of this project. There are several generators
-already, and this one is not uniformly better than all of them. Two things may still
-make it worth ten minutes:
+already, and this one is not uniformly better than all of them — on an independent
+same-wrap reference it is beaten outright by a distance threshold (next section, read it
+first). Two things may still make it worth ten minutes:
 
 * **It is a different signal path.** Everything else in this niche starts from a spacing
   or pitch estimate. This starts from image structure. We have since measured what that
@@ -28,14 +29,77 @@ make it worth ten minutes:
   *right* are close to independent of what winding-sync L1 gets right, but the signed
   errors are not independent at all. See
   [Independence from the spacing arms](#independence-from-the-spacing-arms-measured).
-* **Its confidence carries information.** The confidence is cycle-consistency — how many
-  winding discontinuities accumulate around closed paths through a point. Accepting only
-  the top 10% of constraints raises accuracy from 0.193 to 0.243 (bootstrap 95% CI on the
-  lift [+0.016, +0.073]). We also found that a one-line geometric baseline beats it; that
-  is [below](#a-geometric-baseline-beats-our-confidence), not buried.
+* **Its confidence carries real information, but it is not the best confidence
+  available on these predictions.** The shipped confidence is cycle-consistency — how
+  many winding discontinuities accumulate around closed paths through a point. Accepting
+  only the top 10% of constraints raises accuracy from 0.193 to 0.243 (bootstrap 95% CI
+  on the lift [+0.016, +0.073]). Plain distance from the umbilicus beats it on the
+  identical predictions — decisively (AUC 0.671 against 0.567; a clustered paired
+  bootstrap of the difference, measured 20 August 2026, excludes zero) — and the
+  decision on our side is to treat distance as the primary confidence signal and
+  cycle-conf as a second reported one. Both are reported
+  [below](#a-geometric-baseline-beats-our-confidence), which also says why the shipped
+  files still carry cycle-conf in their `conf` column.
 
 If you only need a winding number and already trust your pitch, you probably do not need
 this.
+
+## An independent same-wrap reference beats this adapter with a ruler (2026-08-20)
+
+This is our own finding, from our own search for an independent check, and it belongs
+above the score table rather than under the caveats.
+[`scroll-truth`](https://github.com/aistae/scroll-truth) (karasukun) ships pairwise
+same-wrap ground truth for PHerc Paris 4, derived from raw CT intensity votes with no
+model output in the loop. On 2026-08-20 we scored this adapter against it by
+reimplementing the scoring from its documented file formats — none of the reference's
+code was executed on our side. Coverage is real, not anecdotal: **46,946 of its 161,198
+judged patch pairs (29%)** carry our points on both patches, via 707 of our points
+attached to 976 reference patches within the spiral fitter's own 2.5-voxel tolerance.
+
+The pipeline was validated before it judged us: the 2,173 hand-annotated ground-truth
+points, pushed through the identical attachment-and-pairing path, agree with the
+scroll-truth reference on **99.0% of 23,140 covered pairs** (97.5% on the 6,878 pairs in
+the hard 3–15 voxel band). So the patch identity is right and the reference is sound —
+which also independently confirms that reference at roughly ten times the scale of its
+own hand-checkable subset, and that cross-validation stands as a contribution regardless
+of what follows. One bookkeeping discrepancy found on the way: the shipped reference
+files hold 201,410 rows, not the ~258,000 its README table states; we scored what ships.
+
+The verdict on us, plainly:
+
+* **A plain surface-distance threshold beats this adapter in every region.** Per-region
+  F1 with the reference as truth: **ours 0.40–0.64, distance 0.84–0.86** (four
+  well-covered regions; the fifth, z6500, holds only 112 covered pairs and is a
+  footnote). We also lose to distance in the hard 3–15 voxel band — inside one wrap
+  period, exactly where a structure-tensor method is supposed to earn its keep. We beat
+  a shuffled-winding control everywhere (its F1 is 0.04–0.06), so the field is not
+  noise; it is worse than a baseline that needs no model.
+* **On pairs whose surfaces actually touch (under 3 voxels), which the reference and the
+  hand-annotation oracle both call the same wrap 94–97% of the time, we say "same wrap"
+  only 34–70% of the time**, depending on region.
+* **The mechanism is measured, not guessed: the winding field decoheres along the
+  sheet, predominantly in z.** Among reference same-wrap pairs, our winding difference
+  stays under 0.5 for **100%** of closest point pairs separated by 0–10 voxels, **52%**
+  at 10–25 voxels, **19%** at 25–50 voxels, essentially never at 100–300 voxels, and
+  past 300 voxels the median drift is **7.4 windings**. The same shows up per patch:
+  of 640 reference patches carrying two or more of our points, 466 have internal winding
+  spread above half a wrap, and the spread grows with the patch's z-extent. Beyond a few
+  tens of voxels this field commits silent wrap-steps routinely — the very failure a
+  winding-constraint generator exists to detect.
+* **The bench in the score table below could not have seen this, by construction.** The
+  constraint-gauge ground-truth chains walk radially across adjacent wraps at short
+  range; they never follow one wrap along z far enough to expose axial drift. M1 0.295
+  there and F1 0.40–0.64 here are not in tension — they measure different directions,
+  and the direction constraint-gauge cannot probe is the one we fail. No aggregation
+  choice rescues it (patch-median pooled F1 0.563, closest-point 0.721 — inflated by
+  shared points, 0.486 in the hard band — same-z 0.704, all far below distance), and
+  confidence gating buys 0.64 pooled at the cost of half the coverage.
+
+What survives this: the sign machinery, the near field (0–10 voxels), and the umbilicus
+anchor, whose value was measured independently in the Ablations section. What does not
+survive is any reading of this adapter as a reliable same-wrap detector beyond a few
+tens of voxels of separation. Read everything below, the score table included, with this
+section in front of it.
 
 ## Scores
 
@@ -124,7 +188,12 @@ we shipped:
 It wins at every accept fraction we measured, from 5% to 95%, and it wins on dw = 1 pairs
 alone (0.453 vs 0.361 at the top 10%, 0.477 vs 0.370 at the top 5%), where the "it is just
 picking easy pairs" objection does not apply. Combining the two does not beat the corrected
-radius on its own.
+radius on its own: the rank-sum row in the table above is nominally +0.003 ahead on the
+top-10% cut while sitting below on AUC (0.656 against 0.671), and a paired bootstrap of
+the difference — pair-level and clustered by ground-truth collection, measured
+20 August 2026, not yet shipped in this repository — straddles zero on the top-10% cut
+under both schemes. A wash on one cut and a loss on the other is not a combination worth
+shipping.
 
 **This is a negative result for the claim this package makes about its confidence**, and it
 is ours, found by auditing our own submission. We have not quietly swapped the shipped
@@ -132,6 +201,19 @@ confidence: cycle-conf measures the method's own internal consistency and radius
 for "this part of the scroll images well", and those are different things to know. But
 anyone weighing whether cycle-conf is the reason to spend ten minutes here should weigh it
 against a one-line geometric rule that does better.
+
+**Where that decision stands, 2026-08-20.** A follow-up measurement pass confirmed the
+gap is decisive — the clustered paired bootstrap on ΔAUC excludes zero, and distance wins
+in every true-Δw stratum separately — and that no combination we tried (equal-weight rank
+average; a grouped-cross-validated two-feature logistic) beats distance alone by more
+than the measurable noise. The decision is therefore: distance from the umbilicus is the
+primary confidence signal for these predictions, cycle-conf the second reported one. The
+adapter files in this repository have **not** been re-emitted: their `conf` column still
+carries cycle-conf, and the corrected radius exists here only as the sign-flip of the
+negative-control arm plus the rows above. Re-emitting the node arm with the corrected
+radius changes a scored submission file, and we will not do that silently; until a
+re-emitted arm is published and re-scored on the bench, the table above is the confidence
+evidence, and the shipped `conf` column should be read as the weaker, historical signal.
 
 ## What we measured ourselves
 
@@ -349,9 +431,11 @@ itself was not committed there — ask the bench author which file to point `--g
 
 ## Honest caveats
 
-* **One bench, one scroll, one date.** Everything above is PHerc Paris 4, July–August 2026.
-  Nothing here has been tested against a second scroll's ground truth. We hold 1667 runs,
-  but on a different pair construction that is not row-comparable to any of this.
+* **One scroll.** Everything above is PHerc Paris 4, July–August 2026 — now two
+  independent references on that one scroll (constraint-gauge, and the scroll-truth
+  scoring at the top of this README), but still no second scroll's ground truth. We hold
+  1667 runs, but on a different pair construction that is not row-comparable to any of
+  this.
 * **The error is biased and radial.** Mean signed residual −2.01, two pairs in three
   under-counted, accuracy 0.033 in the innermost radius decile against 0.311 in the
   outermost. It is not fixable by a scalar; we checked.
@@ -363,8 +447,24 @@ itself was not committed there — ask the bench author which file to point `--g
   sign-corrected twin, however, beats the confidence we ship.
 * **The independence argument is only partly supported**, and the test that would settle it
   cannot be run on anything we hold.
-* **M1 0.295 is not a solved problem.** Seven pairs in ten are still wrong at dw=1. This
-  is a useful independent signal, not a winding solver.
+* **M1 0.295 is not a solved problem, and the scroll-truth section at the top bounds it
+  harder.** Seven pairs in ten are still wrong at dw=1 on constraint-gauge, and on the
+  independent same-wrap reference the field decoheres past a few tens of voxels along
+  the sheet and loses to a distance threshold outright. This is an independent signal
+  with a measured coherence length, not a winding solver and not a same-wrap detector
+  at range.
+* **The one production consumer of winding constraints cannot read a confidence at
+  all.** villa's spiral fitter loads point collections with no per-point or per-pair
+  confidence or weight field; its relative-winding loss is plain L1 at a fixed weight
+  with no robust loss, and the only lever is a per-source-file sampling weight (verified
+  against villa `main`, 2026-08-20; our coordinates already match its frame exactly —
+  all 2173 Paris 4 GT points appear in our point list to three decimals). So "What the
+  confidence buys a solver" above describes a solver that filters on confidence, and the
+  one production solver in the field cannot: using this adapter there means
+  pre-filtering to the high-confidence subset yourself and converting to its
+  point-collection schema. The conversion is mechanical; the pre-filtering is mandatory
+  — at M1 0.295, and given the decoherence measured above, an unfiltered feed hands that
+  fitter more error than signal.
 * **The generator source is not in this repository** — only the three submissions, the
   method description, the numbers, and the scripts that derive them. If you want to run the
   extraction on another scroll, open an issue and it can be cleaned up and added.
