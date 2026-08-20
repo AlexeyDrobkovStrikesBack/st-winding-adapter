@@ -3,6 +3,15 @@
 A generator of **relative winding constraints** for the Herculaneum scrolls: given two
 points inside a scroll volume, how many sheet crossings lie between them.
 
+**Measured range of validity (2026-08-20).** This adapter gives reliable same-wrap
+decisions and winding-step signs only within about 30 voxels along a sheet (measured
+coherence length: 29.8<!--ledger:axfix.coherence_length_vox--> voxels); beyond that its
+winding count drifts by whole wraps and must not be trusted — use it to seed or check
+local constraints, never to carry a winding number across a scroll. A repair was
+attempted against pre-registered criteria and failed; the measurement, the mechanism
+and the attempt are in
+[The drift is radial and not repairable](#the-drift-is-radial-and-not-repairable-2026-08-20).
+
 It gets that number out of the CT image itself — by integrating the lamina normal from
 the **structure tensor** along the path between the two points and counting the sheets
 actually crossed. It therefore makes **no fixed-pitch assumption**: no "one winding is
@@ -78,14 +87,24 @@ The verdict on us, plainly:
   hand-annotation oracle both call the same wrap 94–97% of the time, we say "same wrap"
   only 34–70% of the time**, depending on region.
 * **The mechanism is measured, not guessed: the winding field decoheres along the
-  sheet, predominantly in z.** Among reference same-wrap pairs, our winding difference
-  stays under 0.5 for **100%** of closest point pairs separated by 0–10 voxels, **52%**
-  at 10–25 voxels, **19%** at 25–50 voxels, essentially never at 100–300 voxels, and
-  past 300 voxels the median drift is **7.4 windings**. The same shows up per patch:
-  of 640 reference patches carrying two or more of our points, 466 have internal winding
-  spread above half a wrap, and the spread grows with the patch's z-extent. Beyond a few
-  tens of voxels this field commits silent wrap-steps routinely — the very failure a
-  winding-constraint generator exists to detect.
+  sheet, with a coherence length of 29.8<!--ledger:axfix.coherence_length_vox-->
+  voxels** — the separation at which the median same-wrap residual crosses half a
+  wrap. Among reference same-wrap pairs, our winding difference stays under 0.5 for
+  **99.7%** of closest point pairs separated by 0–10 voxels (an earlier version
+  rounded this to 100%; the stored fraction is 0.9971), **52%** at 10–25 voxels,
+  **19%** at 25–50 voxels, essentially never at 100–300 voxels, and past 300 voxels
+  the median drift is **7.4 windings**<!--ledger:axfix.drift300_med_V0-->. The same
+  shows up per patch: of 640 reference patches carrying two or more of our points,
+  466<!--ledger:axfix.st_patch_spread_gt05_V0--> have internal winding spread above
+  half a wrap, and the spread grows with the patch's z-extent. Beyond a few tens of
+  voxels this field commits silent wrap-steps routinely — the very failure a
+  winding-constraint generator exists to detect. An earlier version of this bullet
+  said the drift is "predominantly in z"; corrected 2026-08-20 after the follow-up
+  investigation below: the residual is deterministic in accumulated *radial*
+  displacement, and axial displacement by itself is nearly free — tall patches drift
+  because following a sheet down z accumulates radial footprint, and it is the radial
+  part the field cannot handle. See
+  [the next section](#the-drift-is-radial-and-not-repairable-2026-08-20).
 * **The bench in the score table below could not have seen this, by construction.** The
   constraint-gauge ground-truth chains walk radially across adjacent wraps at short
   range; they never follow one wrap along z far enough to expose axial drift. M1 0.295
@@ -95,11 +114,130 @@ The verdict on us, plainly:
   shared points, 0.486 in the hard band — same-z 0.704, all far below distance), and
   confidence gating buys 0.64 pooled at the cost of half the coverage.
 
-What survives this: the sign machinery, the near field (0–10 voxels), and the umbilicus
-anchor, whose value was measured independently in the Ablations section. What does not
-survive is any reading of this adapter as a reliable same-wrap detector beyond a few
-tens of voxels of separation. Read everything below, the score table included, with this
-section in front of it.
+What survives this: the sign machinery (with one measured bug in the shipped sign
+convention on two slabs — next section), the near field (0–10 voxels), and the
+umbilicus anchor, whose value was measured independently in the Ablations section.
+What does not survive is any reading of this adapter as a reliable same-wrap detector
+beyond about 30 voxels of separation along a sheet — and a repair attempt has since
+failed against pre-registered criteria (next section), so that boundary is where the
+claim stays: use the adapter to seed or check local constraints, never to carry a
+winding number across a scroll. Read everything below, the score table included, with
+this section in front of it.
+
+## The drift is radial and not repairable (2026-08-20)
+
+The section above left open what the drift actually is and whether it can be fixed.
+A follow-up investigation answered both, against criteria for success written down
+before any repaired variant was scored. Same covered pairs, same thresholds, same
+harness as above; every number below is tracked in our provenance ledger under
+`axfix.*`.
+
+**What the drift is.** On 4,003 same-wrap point pairs, with the expected in-plane
+angular term subtracted, the winding residual is deterministic in accumulated radial
+displacement, not stochastic in z: a linear model in (dr, dz) explains R²
+0.743<!--ledger:axfix.res_dr_dz_R2--> of the residual on same-field pairs beyond 30
+voxels; correlation with dr alone is 0.859<!--ledger:axfix.res_corr_dr-->, with dz
+only -0.154<!--ledger:axfix.res_corr_dz-->. It is not a z-ramp, not a random walk,
+and not discrete slips (the share of mid-range residuals within 0.15 of an integer
+is 0.47<!--ledger:axfix.res_frac_near_integer-->, where a continuous spread would
+give 0.30). The slope is the tell: the residual grows by
+0.0275<!--ledger:axfix.res_vs_dr_slope--> wraps per voxel of radial displacement —
+an effective wrap period of about 36 voxels where the true period is 15–21 — so
+beyond its coherence length the field degrades into a radius measurement at roughly
+half the true gain. That is the same object as the −2.01 mean under-count in the
+error-audit section below. Axial displacement by itself is nearly free: at matched
+separation 80–340 voxels, the median |residual| is
+0.744<!--ledger:axfix.medres_sep80_340_dzdom--> wraps for axially-dominated pairs
+against 1.681<!--ledger:axfix.medres_sep80_340_inplane--> for in-plane-dominated
+ones. What the section above first reported as "axial drift" is radial footprint
+accumulated while following a sheet down z.
+
+**The coherence length is 29.8<!--ledger:axfix.coherence_length_vox--> voxels** —
+the separation along a sheet at which the median same-wrap residual crosses half a
+wrap. Inside it the adapter is essentially perfect (99.7% correct same-wrap at 0–10
+voxels); by 25 voxels it is a coin flip; beyond 50 it is wrong essentially always.
+
+**The repair attempted, and where it stopped.** Two repairs follow from the
+diagnosis, both GT-free and reference-free (they use only the method's own ST
+fields, the umbilicus, and the slice geometry): **V1** canonicalises chirality
+(winding increases outward in every slab) and ties each slab's undefined constant to
+the umbilicus through the radial ST integral; **V2** adds per-(x, y) linear
+z-interpolation of the anchored field between the two bracketing slices — median
+correction applied, 2.238<!--ledger:axfix.v2_correction_med_wraps--> wraps per
+point. The pass/fail bar was pre-registered in writing before any repaired variant
+was scored: REPAIRED requires the pooled 0–3 voxel touching band ≥ 90% and
+per-region F1 within 0.05 of the distance baseline; PARTIALLY REPAIRED requires
+band ≥ 80% and pooled F1 +0.10 absolute; the near-field gauge check must not
+degrade in either case.
+
+The same-wrap ladder (reference same-wrap pairs, closest attached points, identical
+harness to the section above):
+
+| separation (vox) | n | shipped | V1 anchor | V2 anchor + lerp |
+|---|---|---|---|---|
+| 0–10 | 4,881 | 99.7% | 99.7% | 99.9% |
+| 10–25 | 163 | 52.1% | 52.1% | 68.1% |
+| 25–50 | 16 | 18.8% | 18.8% | 31.2% |
+| 50–100 | 6 | 0% | 0% | 0% |
+| 100–300 | 93 | 0% | 0% | 3.2% |
+| 300–3,000 | 859 | 5.5% | 3.4% | 7.6% |
+
+The interpolation does something real at mid-range: the 10–25 band moves
+0.521<!--ledger:axfix.ladder_10_25_V0--> →
+0.681<!--ledger:axfix.ladder_10_25_V2-->, the 25–50 band
+0.188<!--ledger:axfix.ladder_25_50_V0--> →
+0.312<!--ledger:axfix.ladder_25_50_V2-->, and the median drift beyond 300 voxels
+falls from 7.39<!--ledger:axfix.drift300_med_V0--> to
+5.89<!--ledger:axfix.drift300_med_V2--> windings. And it does not matter: the
+ladder still collapses by 50 voxels, patches with internal spread above half a wrap
+go 466<!--ledger:axfix.st_patch_spread_gt05_V0--> →
+485<!--ledger:axfix.st_patch_spread_gt05_V2--> of 640, pooled F1 goes
+0.563<!--ledger:axfix.st_pooled_f1_V0--> →
+0.491<!--ledger:axfix.st_pooled_f1_V2--> (V1:
+0.563<!--ledger:axfix.st_pooled_f1_V1-->, exactly the shipped value — the anchor is
+a no-op on this bench), and the pre-registered progress metric, the 0–3 voxel
+touching band, stays flat: 0.523<!--ledger:axfix.st_band03_V0--> shipped,
+0.522<!--ledger:axfix.st_band03_V1--> V1, 0.505<!--ledger:axfix.st_band03_V2--> V2,
+against 94–97% from the reference and the hand oracle. Distance stays at F1
+0.84–0.86 in every region; no variant comes near it anywhere.
+
+**Verdict, against the pre-stated conditions: NOT REPAIRED.** Neither variant
+reaches even the partial bar. The criteria also fixed in advance that a V2-over-V1
+edge below 0.02 pooled F1 would not justify shipping the extra machinery; V2 lands
+*below* V1 on pooled F1. The in-plane half-gain decoherence has no candidate fix
+inside this method — no anchoring, interpolation, or integer constraint can put back
+information the in-plane integration never captured — and the criteria file
+predicted in writing that it would remain. This is why the range-of-validity
+statement at the top of this README is a boundary, not a to-do item. (V2's
+near-field side effect, for completeness: M1 stays at
+0.2955<!--ledger:axfix.gauge_M1_V2--> and MAE improves to
+2.4646<!--ledger:axfix.gauge_MAE_V2--> from
+2.5866<!--ledger:axfix.gauge_MAE_V0-->.)
+
+**Two by-products of the investigation, disclosed because they are our own bugs:**
+
+* **The shipped sign convention on the z7500 and z13500 slabs is wrong.** The
+  global sign of each per-slice field was in fact matched to the per-slice
+  winding-sync L1 field, not anchored to the umbilicus as the Method section below
+  used to state, and on those two slabs the shipped fields come out with winding
+  *decreasing* outward. The shipped adapter JSONs are affected: points in those two
+  slabs carry the inverted convention. Correcting the chirality alone (part of V1)
+  moves the reimplemented near-field bench M1 from
+  0.2955<!--ledger:axfix.gauge_M1_V0--> to
+  0.3064<!--ledger:axfix.gauge_M1_V1--> on the 8,156 GT pairs. The files have
+  **not** been re-emitted, for the same reason the confidence column was not
+  swapped: re-emitting changes a scored submission, and we will not do that
+  silently. Until a corrected arm is published and re-scored on the bench, the
+  shipped files stand as scored, bug included.
+* **Two of our per-slice umbilici contradict each other.** The z7500 umbilicus sits
+  about 6,600 voxels in-plane from the z9000 one, which is physically impossible
+  for the same scroll core — one of the two is wrong, and we do not know which.
+  This touches every quantity computed from the z7500 umbilicus: the
+  distance-from-umbilicus confidence for points in that slab, the
+  umbilicus-anchored constant of that field in V1/V2 above, and the z6500
+  scroll-truth region (112 covered pairs, already flagged above as a footnote). It
+  does not touch the winding magnitudes themselves (the L2 group synchronisation
+  does not use the umbilicus) or the other slabs.
 
 ## Scores
 
@@ -138,8 +276,13 @@ Context for those numbers:
   own retired built-in S-E adapter* (M1 0.1298, MAE 4.102) — not a winding-sync L1 solve.
   Our own winding-sync L1 rebuild scores **0.127 in the raw gauge and 0.165
   umbilicus-anchored** (MAE 3.992 / 2.989). The fair comparison is against the anchored
-  rebuild, since our arm carries the same anchor, and that puts the lead at 0.295 / 0.165 =
-  **1.8×**. The old sentence "it is not reproducible from this repository alone" was half
+  rebuild — it is the strongest baseline we can rebuild, and comparing against the weaker
+  raw gauge would flatter us — and that puts the lead at 0.295 / 0.165 = **1.8×**. An
+  earlier version justified this choice by saying our arm "carries the same anchor";
+  measured 2026-08-20, the shipped arm's per-slab sign is in fact matched to the
+  winding-sync L1 field, not umbilicus-anchored (see
+  [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20)), so that
+  justification was wrong; the choice of the stronger baseline stands on its own. The old sentence "it is not reproducible from this repository alone" was half
   right and is replaced by something checkable: all five baseline figures come out of
   `evidence_numbers.py` (see [below](#re-deriving-these-numbers)) from our local bench runs,
   which are not in this repository; what was never reproducible was the *label* on 0.130.
@@ -279,7 +422,10 @@ Accuracy by decile of the pair's minimum radius from the umbilicus (overall accu
 A factor of nine between the inner and the outer decile. On the inner windings the adapter
 is close to useless; on the outer half it is around 0.30. Radius per pair is computed from
 the same per-slice umbilicus the generator itself used. This is also the mechanism behind
-the sign-corrected radius result above.
+the sign-corrected radius result above. One of those umbilici is now known to be suspect
+— the z7500 one sits about 6,600 voxels in-plane from the z9000 one, which cannot be
+right; see [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20) for
+what that does and does not affect.
 
 Two other slices, for completeness: accuracy by position along the scroll axis varies
 (0.14–0.27 across z quintiles) with no clean ordering, and within dw = 1 pairs the shortest
@@ -444,8 +590,14 @@ corrected 2026-08-20.
    over the raw edge deltas — a least-squares fit over the whole graph rather than a
    spanning-tree walk, so a single bad edge does not flip a branch. Worth +0.062 M1 over
    radial integration, measured above.
-3. **Global orientation.** One bit per scroll, anchored on the umbilicus. Worth +0.038 M1
-   and a full point of MAE even applied to someone else's windings. See caveats.
+3. **Global orientation.** Intended as one bit per scroll, anchored on the umbilicus —
+   and that anchor is worth +0.038 M1 and a full point of MAE even applied to someone
+   else's windings (see Ablations). But the shipped fields do not implement it: measured
+   2026-08-20, the per-slab sign was matched to the winding-sync L1 field instead, and on
+   two of the seven slabs (z7500, z13500) it comes out inverted — see
+   [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20) and caveats.
+   An earlier version of this line stated the umbilicus anchoring as fact; corrected
+   2026-08-20.
 4. **Confidence.** Cycle-consistency: discontinuities accumulated around closed paths.
 
 ## Honest caveats
@@ -461,17 +613,22 @@ corrected 2026-08-20.
 * **The global sign does not transfer.** The whole sign problem reduces to one global
   orientation bit per scroll. The umbilicus anchor is geometry-lucky on Paris 4 and is
   **not** a general GT-free resolver; on a new scroll it needs one bit of ground truth
-  (two annotated points) or another anchor.
+  (two annotated points) or another anchor. And as shipped it is not even applied
+  uniformly here: the sign convention on the z7500 and z13500 slabs is inverted (winding
+  decreases outward), matched to the winding-sync L1 field rather than the umbilicus —
+  found 2026-08-20, files not re-emitted; see
+  [the drift section](#the-drift-is-radial-and-not-repairable-2026-08-20).
 * **radius-conf is anti-calibrated.** Listed above; do not use it as a confidence. Its
   sign-corrected twin, however, beats the confidence we ship.
 * **The independence argument is only partly supported**, and the test that would settle it
   cannot be run on anything we hold.
 * **M1 0.295 is not a solved problem, and the scroll-truth section at the top bounds it
   harder.** Seven pairs in ten are still wrong at dw=1 on constraint-gauge, and on the
-  independent same-wrap reference the field decoheres past a few tens of voxels along
-  the sheet and loses to a distance threshold outright. This is an independent signal
-  with a measured coherence length, not a winding solver and not a same-wrap detector
-  at range.
+  independent same-wrap reference the field decoheres past its ~30-voxel coherence
+  length along the sheet and loses to a distance threshold outright — and the repair
+  attempt failed against pre-registered criteria, so the bound is a property of the
+  method, not a backlog item. This is an independent signal with a measured coherence
+  length, not a winding solver and not a same-wrap detector at range.
 * **The one production consumer of winding constraints cannot read a confidence at
   all.** villa's spiral fitter loads point collections with no per-point or per-pair
   confidence or weight field; its relative-winding loss is plain L1 at a fixed weight
