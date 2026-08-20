@@ -208,7 +208,8 @@ def fig_independence(pairs_by_arm, shares, out):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--gauge", default="/home/alexr/vesuvius/_gauge")
+    ap.add_argument("--gauge", required=True,
+                    help="local constraint-gauge run directory (not in this repository; see README)")
     ap.add_argument("--out", default=".")
     a = ap.parse_args()
     G = a.gauge

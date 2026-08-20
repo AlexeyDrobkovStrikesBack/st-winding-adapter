@@ -401,7 +401,8 @@ python make_evidence_figures.py --gauge /path/to/_gauge --out .
 
 The first prints every number in this section, in sections that match these headings; the
 second writes `precision_coverage.png`, `error_structure.png` and `error_independence.png`.
-`numpy`, `scipy` and `matplotlib` are the only dependencies.
+`numpy`, `scipy` and `matplotlib` are the only dependencies, pinned in
+`requirements.txt` at the versions every number here was re-verified with.
 
 `_gauge` is our local `constraint-gauge` run directory — 52 GB of per-pair CSVs, seed
 graphs and run output, plus the bench author's ground truth, none of which is ours to

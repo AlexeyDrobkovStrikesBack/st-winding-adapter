@@ -24,7 +24,10 @@ import sys
 import csv, glob, itertools, json, os
 import numpy as np
 
-G = sys.argv[1] if len(sys.argv) > 1 else "/home/alexr/vesuvius/_gauge"
+if len(sys.argv) < 2:
+    sys.exit("usage: evidence_numbers.py /path/to/_gauge  "
+             "(your local constraint-gauge run directory; not in this repository — see README)")
+G = sys.argv[1]
 FIN = f"{G}/_deliverable/_finer"
 H2H = f"{G}/_headtohead"
 

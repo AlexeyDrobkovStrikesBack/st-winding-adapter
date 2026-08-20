@@ -1,0 +1,13 @@
+# Everything the three shipped scripts need, at the versions every number in
+# this repository was re-verified with in this environment (last full re-run of
+# evidence_numbers.py: 2026-08-20). Nothing here uses a recent feature, so
+# older releases are very likely fine; these are the ones we actually ran, not
+# a guess.
+#
+# evidence_numbers.py needs numpy + scipy; make_calibration_figure.py needs
+# matplotlib alone; make_evidence_figures.py needs all three. All of them also
+# need the per-pair CSVs of a local constraint-gauge run, which are not in this
+# repository — see "Re-deriving these numbers" in the README.
+numpy==2.5.1
+scipy==1.18.0
+matplotlib==3.11.1
